@@ -10,6 +10,7 @@ from wfc.sudoku.board import Board
 from wfc.sudoku.constraints import is_consistent
 from wfc.sudoku.generator import generate_puzzle
 from wfc.sudoku.parser import from_file
+from wfc.sudoku.solver import solve as sudoku_solve
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,27 @@ def cmd_generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_solve(args: argparse.Namespace) -> int:
+    try:
+        board = _load_board(args.input)
+    except (ValueError, OSError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    givens = sum(1 for cell in board.iter_cells() if cell.given)
+    logger.info("solve: loaded board with %d givens, seed=%s", givens, args.seed)
+    result = sudoku_solve(board, seed=args.seed)
+    if result is None:
+        print("No solution exists for this board.", file=sys.stderr)
+        return 2
+    if args.render is not None:
+        print("warn: --render not implemented yet (phase 4)", file=sys.stderr)
+    if args.raw:
+        print(result.to_string())
+    else:
+        print(result)
+    return 0
+
+
 def cmd_not_implemented(args: argparse.Namespace) -> int:
     print(f"[wfc] command '{args.command}' is not implemented yet.", file=sys.stderr)
     return 1
@@ -162,12 +184,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     generate.set_defaults(func=cmd_generate)
 
-    solve = sub.add_parser("solve", help="Solve a sudoku puzzle (not implemented yet).")
+    solve = sub.add_parser("solve", help="Solve a sudoku puzzle with the WFC engine.")
     solve.add_argument("input", help=input_help)
-    solve.add_argument("--render", metavar="PATH", help="Render the solution to an image file.")
-    solve.add_argument("--animate", metavar="PATH", help="Animate the solving process.")
     solve.add_argument("--seed", type=int, default=None, help="Random seed for determinism.")
-    solve.set_defaults(func=cmd_not_implemented)
+    solve.add_argument(
+        "--raw", action="store_true", help="Output as 81-char string instead of formatted grid."
+    )
+    solve.add_argument(
+        "--render", metavar="PATH", help="Render the solution to an image file (phase 4)."
+    )
+    solve.add_argument(
+        "--animate", metavar="PATH", help="Animate the solving process (phase 4)."
+    )
+    solve.set_defaults(func=cmd_solve)
 
     bench = sub.add_parser("bench", help="Benchmark the solver (not implemented yet).")
     bench.add_argument("dir", help="Directory containing puzzle files.")

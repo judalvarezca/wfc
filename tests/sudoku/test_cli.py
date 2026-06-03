@@ -78,11 +78,52 @@ def test_validate_reports_givens(tmp_path, capsys):
     assert "Solved: False" in captured.out
 
 
-def test_solve_is_stubbed(capsys):
+def test_solve_easy_prints_solution(capsys):
     exit_code = main(["solve", EASY])
     captured = capsys.readouterr()
-    assert exit_code == 1
-    assert "not implemented" in captured.err.lower()
+    assert exit_code == 0
+    # Sample digit from the known easy solution at (0, 2) = 4
+    assert "5 3 4 | 6 7 8" in captured.out
+
+
+def test_solve_raw_outputs_81_chars(capsys):
+    exit_code = main(["solve", EASY, "--raw"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    output = captured.out.strip()
+    assert len(output) == 81
+    assert all(c in "123456789" for c in output)
+
+
+def test_solve_unsolvable_returns_2(capsys):
+    unsolvable = "55" + "0" * 79  # two 5s in row 0
+    exit_code = main(["solve", unsolvable])
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "no solution" in captured.err.lower()
+
+
+def test_solve_seed_determinism(capsys):
+    main(["solve", EASY, "--seed", "42", "--raw"])
+    a = capsys.readouterr().out.strip()
+    main(["solve", EASY, "--seed", "42", "--raw"])
+    b = capsys.readouterr().out.strip()
+    assert a == b
+
+
+def test_solve_pipeline_from_generate(monkeypatch, capsys):
+    """generate | solve -: solver consumes generator output via stdin."""
+    import io
+
+    main(["generate", "--givens", "35", "--seed", "1", "--raw"])
+    puzzle = capsys.readouterr().out.strip()
+    monkeypatch.setattr("sys.stdin", io.StringIO(puzzle))
+    exit_code = main(["solve", "-", "--raw"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    solved = captured.out.strip()
+    assert len(solved) == 81
+    assert all(c in "123456789" for c in solved)
 
 
 def test_generate_full_board_formatted(capsys):
