@@ -250,6 +250,16 @@ function applyEvent(ev) {
       }
       break;
     }
+    case "Restarted": {
+      // Whole attempt thrown away. Flash the board red briefly, then clear
+      // every solver-placed cell. Different from Backtracked in scope only.
+      boardEl.classList.add("flash-backtrack");
+      setTimeout(() => boardEl.classList.remove("flash-backtrack"), FLASH_MS);
+      for (const [ur, uc] of ev.undid_vars) {
+        applyClear(ur, uc);
+      }
+      break;
+    }
     case "Solved": {
       clearObserved();
       boardEl.classList.add("flash-solved");

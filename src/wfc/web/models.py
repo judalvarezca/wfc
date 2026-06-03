@@ -49,6 +49,12 @@ class BacktrackedEvent(BaseModel):
     undid_vars: list[tuple[int, int]]
 
 
+class RestartedEvent(BaseModel):
+    type: Literal["Restarted"] = "Restarted"
+    attempt: int
+    undid_vars: list[tuple[int, int]]
+
+
 class SolvedEvent(BaseModel):
     type: Literal["Solved"] = "Solved"
 
@@ -61,6 +67,7 @@ SolveEvent = (
     ObservedEvent
     | CollapsedEvent
     | BacktrackedEvent
+    | RestartedEvent
     | SolvedEvent
     | ContradictionEvent
 )

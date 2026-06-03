@@ -138,6 +138,29 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bench(args: argparse.Namespace) -> int:
+    from wfc.sudoku.bench import format_table
+    from wfc.sudoku.bench import run as bench_run
+
+    directory = Path(args.dir)
+    if not directory.exists() or not directory.is_dir():
+        print(f"error: {directory} is not a directory", file=sys.stderr)
+        return 1
+    policy_names = (
+        ["backtrack", "restart"] if args.policy == "both" else [args.policy]
+    )
+    logger.info(
+        "bench: dir=%s policies=%s seed=%s repeat=%d",
+        directory,
+        policy_names,
+        args.seed,
+        args.repeat,
+    )
+    results = bench_run(directory, policy_names, seed=args.seed, repeat=args.repeat)
+    print(format_table(results))
+    return 0
+
+
 def cmd_not_implemented(args: argparse.Namespace) -> int:
     print(f"[wfc] command '{args.command}' is not implemented yet.", file=sys.stderr)
     return 1
@@ -205,9 +228,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     solve.set_defaults(func=cmd_solve)
 
-    bench = sub.add_parser("bench", help="Benchmark the solver (not implemented yet).")
-    bench.add_argument("dir", help="Directory containing puzzle files.")
-    bench.set_defaults(func=cmd_not_implemented)
+    bench = sub.add_parser(
+        "bench", help="Benchmark policies over a directory of puzzles."
+    )
+    bench.add_argument("dir", help="Directory with *.txt puzzles (non-recursive).")
+    bench.add_argument("--seed", type=int, default=None, help="Seed for determinism.")
+    bench.add_argument(
+        "--policy",
+        choices=["backtrack", "restart", "both"],
+        default="both",
+        help="Policy to benchmark (default: both).",
+    )
+    bench.add_argument(
+        "--repeat",
+        type=int,
+        default=3,
+        help="Runs per (puzzle, policy) — reports median time. Default: 3.",
+    )
+    bench.set_defaults(func=cmd_bench)
 
     serve = sub.add_parser("serve", help="Run the web UI (FastAPI + browser).")
     serve.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1).")

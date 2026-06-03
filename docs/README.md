@@ -142,15 +142,32 @@ Componentes del **adapter sudoku**:
 
 **Entregable:** `wfc solve examples/easy.txt` resuelve; tests del engine genérico (con un mock adapter mínimo) + tests del adapter sudoku.
 
-#### Fase 3c — Restart policy y benchmarking
+#### Fase 3c — Restart policy y benchmarking ✅ CERRADA
 
-**Objetivo:** segunda implementación de `ResolutionPolicy` y comparación.
+**Objetivo:** segunda implementación de `ResolutionPolicy` y decisión por datos.
 
-- `core/policy.py`: `RestartPolicy` y `HybridPolicy`.
-- `wfc bench` operativo: corre todos los tableros de `examples/` con cada policy y reporta tiempos/backtracks/restarts.
-- Decidir el default para sudoku en base a benchmarks.
+- `core/policy.py`: `RestartPolicy(max_attempts=200)` — clásico WFC (Gumin): en contradicción, abandona el intento y reinicia con la rng avanzada. El selector y sampler comparten rng entre intentos para explorar paths distintos.
+- `core/events.py`: `Restarted(attempt, undid_vars)` — análogo a `Backtracked` pero el scope son TODAS las variables colapsadas en el intento fallido. Web layer + frontend manejan el nuevo evento (limpia las celdas).
+- `wfc/sudoku/bench.py` + `wfc bench [dir] [--seed N] [--policy] [--repeat N]`: corre cada puzzle contra cada policy, reporta tabla con tiempo/observed/backtracks/restarts.
 
-**Entregable:** `wfc bench examples/` produce tabla comparativa.
+**Bug fix relacionado:** la propagación post-collapse podía emitir `Collapsed` events y luego raises `ContradictionError`. Esos vars no entraban a `undid_vars` (el `.extend(propagated)` no se ejecutaba). Solución: `_make_tracker` envuelve el sink y captura `Collapsed` en una lista pasada por referencia — sobrevive a las excepciones. Aplica a ambas policies.
+
+**Resultados (`wfc bench examples/ --seed 42`):**
+
+| puzzle | policy    | time (ms) | observed | backtracks | restarts |
+|--------|-----------|-----------|----------|------------|----------|
+| easy   | backtrack | 0.93      | 0        | 0          | —        |
+| easy   | restart   | 0.54      | 0        | —          | 0        |
+| medium | backtrack | 0.89      | 0        | 0          | —        |
+| medium | restart   | 0.58      | 0        | —          | 0        |
+| hard   | backtrack | 4.94      | 8        | 6          | —        |
+| hard   | restart   | 176.19    | 568      | —          | 114      |
+
+Easy/medium se resuelven por pura propagación (naked+hidden singles encadenados a partir de los givens) — ambas policies son equivalentes. En hard, **backtracking es ~36× más rápido** que restart: backtrack hace cirugía sobre una decisión equivocada (6 backtracks); restart tira todo a la basura cada vez que se atasca (114 restarts × 568 observaciones totales).
+
+**Decisión:** **default sudoku = BacktrackPolicy** (ya era el default; los datos lo confirman). Esto era esperable porque sudoku tiene soluciones escasas — backtrack apunta finamente. WFC clásico con restart fue diseñado para tile/dungeon generation donde las soluciones son abundantes y los conflictos profundos, contexto donde el cálculo perdido por backtrack supera lo que cuesta restart. `RestartPolicy` se queda como segundo cliente para validar la genericidad del engine, no como mejor opción de sudoku.
+
+**`HybridPolicy` queda diferida:** los benchmarks no muestran un nicho intermedio donde híbrido (backtrack con restart como fallback) supere a backtrack puro. Se reconsidera sólo si aparece un puzzle donde backtrack se atasca catastróficamente y restart converge.
 
 ---
 

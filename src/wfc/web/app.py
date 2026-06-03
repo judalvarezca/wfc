@@ -12,6 +12,7 @@ from wfc.core.events import (
     Contradiction,
     Event,
     Observed,
+    Restarted,
     Solved,
 )
 from wfc.sudoku.board import Board
@@ -25,6 +26,7 @@ from wfc.web.models import (
     GenerateRequest,
     GenerateResponse,
     ObservedEvent,
+    RestartedEvent,
     SolvedEvent,
     SolveEvent,
     SolveRequest,
@@ -93,6 +95,8 @@ def _serialize_event(e: Event) -> SolveEvent:
         return CollapsedEvent(var=e.var, state=e.state)
     if isinstance(e, Backtracked):
         return BacktrackedEvent(var=e.var, state=e.state, undid_vars=list(e.undid_vars))
+    if isinstance(e, Restarted):
+        return RestartedEvent(attempt=e.attempt, undid_vars=list(e.undid_vars))
     if isinstance(e, Solved):
         return SolvedEvent()
     if isinstance(e, Contradiction):
