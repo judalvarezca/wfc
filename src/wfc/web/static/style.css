@@ -207,6 +207,8 @@ button:disabled {
   font-size: 13px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color: var(--text);
+  white-space: pre;
+  line-height: 1.5;
 }
 
 @media (max-width: 760px) {
