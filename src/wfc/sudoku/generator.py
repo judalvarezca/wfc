@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import random
 
-from wfc.board import ALL_VALUES, SIZE, Board, Cell
+from wfc.sudoku.board import ALL_VALUES, SIZE, Board, Cell
 
 logger = logging.getLogger(__name__)
 

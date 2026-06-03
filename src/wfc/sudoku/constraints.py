@@ -3,13 +3,18 @@ from __future__ import annotations
 import logging
 from functools import cache
 
-from wfc.board import BOX, SIZE, Board
+from wfc.core.exceptions import ContradictionError
+from wfc.sudoku.board import BOX, SIZE, Board
+
+__all__ = [
+    "UNITS",
+    "ContradictionError",
+    "is_consistent",
+    "peers",
+    "propagate",
+]
 
 logger = logging.getLogger(__name__)
-
-
-class ContradictionError(Exception):
-    """Raised when constraint propagation detects an unsolvable state."""
 
 
 @cache

@@ -6,10 +6,10 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from wfc.board import Board
-from wfc.constraints import is_consistent
-from wfc.generator import generate_puzzle
-from wfc.parser import from_file
+from wfc.sudoku.board import Board
+from wfc.sudoku.constraints import is_consistent
+from wfc.sudoku.generator import generate_puzzle
+from wfc.sudoku.parser import from_file
 
 logger = logging.getLogger(__name__)
 

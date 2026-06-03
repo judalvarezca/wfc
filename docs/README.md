@@ -1,228 +1,261 @@
-# Plan de trabajo — Wave Function Collapse para resolución de Sudokus
+# Plan de trabajo — Wave Function Collapse (engine genérico + adapter Sudoku)
 
-## 1. Resumen
+## 1. Visión y alcance
 
-Este proyecto implementa el algoritmo **Wave Function Collapse (WFC)** aplicado a la resolución de Sudokus 9×9. Cada celda del tablero se modela como una "función de onda" en superposición de los valores `{1..9}`; el algoritmo colapsa iterativamente la celda de menor entropía y propaga las restricciones (fila, columna y caja 3×3) hasta resolver el tablero o detectar contradicción (en cuyo caso se hace backtracking).
+Este proyecto implementa el algoritmo **Wave Function Collapse (WFC)** como un **engine reutilizable** para generación procedural y resolución de problemas tipo CSP (Constraint Satisfaction Problem).
 
-El proyecto se desarrolla en **Python 3.11+** y se organiza en fases incrementales: modelo de datos → algoritmo → visualización → pruebas → CLI.
+WFC fue diseñado originalmente (Maxim Gumin, 2016) para generación procedural — texturas, mapas de tiles, dungeons. Su mecánica central — "celdas en superposición, observación de la celda de menor entropía, colapso, propagación de restricciones" — se aplica también a Sudoku y otros CSPs.
+
+**El proyecto separa explícitamente dos capas:**
+
+- **Engine genérico (`wfc.core`)** — abstracciones del algoritmo: wave, restricciones, propagación, política de resolución, selector de celdas, muestreador de valores. No sabe nada de sudokus, tiles ni dungeons.
+- **Adapters (`wfc.sudoku`, futuros `wfc.tiles`, `wfc.dungeons`)** — implementaciones específicas de un dominio: cómo se ven las variables, qué restricciones aplican, cómo se renderiza.
+
+Sudoku es la **primera aplicación** y guía el diseño del engine. Aplicaciones posteriores reutilizan el core sin tocarlo.
+
+Lenguaje: **Python 3.11+**.
 
 ---
 
-## 2. Estructura del repositorio
+## 2. Arquitectura por capas
 
 ```
 ~/projects/wfc/
-├── README.md                  # Descripción de alto nivel del repo
-├── pyproject.toml             # Configuración del paquete (deps, ruff, pytest)
+├── README.md
+├── pyproject.toml
 ├── docs/
-│   └── README.md              # (este documento) Plan de trabajo
+│   ├── README.md              # (este documento)
+│   └── PROGRESS.md            # Bitácora de fases cerradas
 ├── src/
 │   └── wfc/
 │       ├── __init__.py
-│       ├── board.py           # Modelo de tablero y estado de celdas
-│       ├── constraints.py     # Restricciones (fila/columna/caja)
-│       ├── solver.py          # Núcleo del algoritmo WFC + backtracking
-│       ├── renderer.py        # Renderizado gráfico (matplotlib / pygame)
-│       ├── parser.py          # Lectura de tableros (string, archivo)
-│       └── cli.py             # Punto de entrada en línea de comandos
+│       ├── __main__.py
+│       ├── cli.py             # CLI: despacha a subcomandos por adapter
+│       ├── core/              # ENGINE GENÉRICO — no sabe de sudoku
+│       │   ├── __init__.py
+│       │   ├── exceptions.py  # ContradictionError
+│       │   ├── wave.py        # (fase 3b) Wave: variables con dominios finitos
+│       │   ├── constraint.py  # (fase 3b) Constraint Protocol
+│       │   ├── engine.py      # (fase 3b) loop observe/collapse/propagate
+│       │   ├── selector.py    # (fase 3b) CellSelector — entropía mínima default
+│       │   ├── sampler.py     # (fase 3b) ValueSampler — uniforme / con pesos
+│       │   └── policy.py      # (fase 3b/3c) ResolutionPolicy: Backtrack / Restart / Hybrid
+│       └── sudoku/            # ADAPTER 1 — específico de Sudoku 9×9
+│           ├── __init__.py
+│           ├── board.py       # Cell, Board (modelo de datos)
+│           ├── constraints.py # AllDifferent en filas/cols/cajas, propagate
+│           ├── generator.py   # Generador de tableros válidos
+│           ├── parser.py      # Lectura desde string/archivo
+│           ├── adapter.py     # (fase 3b) Glue Board ↔ Wave
+│           └── renderer.py    # (fase 4) Renderizado matplotlib
 ├── tests/
 │   ├── conftest.py
-│   ├── fixtures/              # Tableros de prueba (.txt / .json)
-│   ├── test_board.py
-│   ├── test_constraints.py
-│   ├── test_solver.py
-│   └── test_renderer.py
+│   ├── test_smoke.py
+│   ├── core/                  # (fase 3b) Tests del engine genérico
+│   └── sudoku/                # Tests del adapter sudoku
+│       ├── test_board.py
+│       ├── test_constraints.py
+│       ├── test_generator.py
+│       ├── test_cli.py
+│       └── test_solver.py     # (fase 3b)
 └── examples/
     ├── easy.txt
     ├── medium.txt
-    ├── hard.txt
-    └── expert.txt
+    └── generated/             # Tableros generados con --save
 ```
+
+**Principio:** una aplicación nueva (tiles, dungeons) se agrega creando un nuevo subpaquete `adapters/<dominio>/` sin modificar `core/` ni `sudoku/`.
 
 ---
 
 ## 3. Fases de desarrollo
 
-### Fase 0 — Bootstrap del proyecto
+### Fase 0 — Bootstrap del proyecto ✅ CERRADA
 
-**Objetivo:** dejar el entorno y la estructura listos para iterar.
+Estructura, dependencias, herramientas. Ver `docs/PROGRESS.md`.
 
-- Inicializar `pyproject.toml` con dependencias: `numpy`, `matplotlib`, `pytest`, `pytest-cov`, `ruff`.
-- Configurar `ruff` para linting/formato y `pytest` con cobertura mínima.
-- Crear la estructura de carpetas (`src/wfc`, `tests`, `examples`).
-- Añadir `Makefile` (o scripts) para `make test`, `make lint`, `make run`.
+### Fase 1 — Modelo de datos del Sudoku ✅ CERRADA
 
-**Entregable:** `pytest` corre (sin tests aún) y `python -m wfc --help` no falla.
+`Cell`, `Board`, `parser`. Ver `docs/PROGRESS.md`.
+
+### Fase 2 — Restricciones y propagación (sudoku) ✅ CERRADA
+
+`peers`, `UNITS`, `propagate` con naked + hidden singles, `ContradictionError`. Ver `docs/PROGRESS.md`.
+
+### Fase 3 — Refactor a arquitectura por capas + solver
+
+Esta fase se subdivide:
+
+#### Fase 3a — Refactor estructural (sin nueva funcionalidad)
+
+**Objetivo:** establecer la separación core/adapter sin romper nada.
+
+- Crear `src/wfc/core/` con `exceptions.py` (`ContradictionError`).
+- Mover `board.py`, `constraints.py`, `generator.py`, `parser.py` a `src/wfc/sudoku/`.
+- `wfc.sudoku.constraints` re-exporta `ContradictionError` desde `wfc.core.exceptions` para compatibilidad con tests.
+- Reorganizar `tests/` en subcarpetas `tests/sudoku/` (y `tests/core/` vacía para futuro).
+- Actualizar imports en CLI y tests.
+- **No tocar la lógica funcional.** Los 75 tests deben seguir verdes; ruff limpio.
+
+**Entregable:** `pytest -q` con 75 verdes en la nueva estructura; commit dedicado.
+
+#### Fase 3b — Engine WFC genérico + adapter Sudoku
+
+**Objetivo:** construir el engine y adaptar sudoku para usarlo.
+
+Componentes del **core**:
+
+- `core/wave.py`:
+  - `Wave` Protocol — abstracción de "colección de variables con dominios finitos".
+  - Operaciones: `variables()`, `domain(var)`, `is_collapsed(var)`, `entropy(var)`, `clone()`, `is_fully_collapsed()`.
+- `core/constraint.py`:
+  - `Constraint` Protocol — `propagate(wave, recently_collapsed)` aplicado tras un colapso. El adapter aporta las constraints concretas.
+- `core/selector.py`:
+  - `CellSelector` Protocol — elige qué variable colapsar.
+  - Implementación default: `LowestEntropySelector` (MRV generalizado; rompe empates por orden estable o aleatorio con seed).
+- `core/sampler.py`:
+  - `ValueSampler` Protocol — elige qué valor probar dentro del dominio.
+  - Implementación default: `UniformSampler` (uniforme dentro del dominio).
+  - Extensible: `WeightedSampler` (para tiles con pesos), hook para LCV opcional.
+- `core/policy.py`:
+  - `ResolutionPolicy` Protocol — qué hacer ante contradicción.
+  - Implementación primera: `BacktrackPolicy` (deshace última decisión).
+  - (fase 3c) `RestartPolicy`, `HybridPolicy`.
+- `core/engine.py`:
+  - `solve(wave, constraints, selector, sampler, policy) -> Wave | None`.
+  - Loop: propagate inicial → observe → collapse → propagate → repeat. Ante contradicción, delega en policy.
+  - Emite eventos (generator) para instrumentación y visualización: `Observed(var)`, `Collapsed(var, value)`, `Propagated(eliminations)`, `Contradicted`, `Backtracked`.
+
+Componentes del **adapter sudoku**:
+
+- `sudoku/adapter.py`:
+  - `BoardWave` — implementa el protocol `Wave` sobre `Board` (o reemplaza `Board` con uso directo).
+  - `SudokuConstraint` — implementa `Constraint` con la propagación actual (naked + hidden singles).
+- `sudoku/solver.py`:
+  - Función `solve(board) -> Board | None` que arma el engine con defaults sudoku-friendly y devuelve la solución.
+- CLI: `wfc solve <input>` operativo.
+
+**Decisiones tomadas en esta fase:**
+- **Selector default:** entropía mínima (MRV generalizado). Sin LCV en value-ordering inicial — se agrega como hook opcional sólo si benchmarks de sudoku lo justifican.
+- **Policy default:** backtracking (toda la maquinaria ya existe: clone + ContradictionError).
+- **Estructura de candidatos:** `set[int]` — se reconsidera con bitmasks si los benchmarks lo exigen.
+
+**Entregable:** `wfc solve examples/easy.txt` resuelve; tests del engine genérico (con un mock adapter mínimo) + tests del adapter sudoku.
+
+#### Fase 3c — Restart policy y benchmarking
+
+**Objetivo:** segunda implementación de `ResolutionPolicy` y comparación.
+
+- `core/policy.py`: `RestartPolicy` y `HybridPolicy`.
+- `wfc bench` operativo: corre todos los tableros de `examples/` con cada policy y reporta tiempos/backtracks/restarts.
+- Decidir el default para sudoku en base a benchmarks.
+
+**Entregable:** `wfc bench examples/` produce tabla comparativa.
 
 ---
 
-### Fase 1 — Modelo de datos del Sudoku
+### Fase 4 — Renderizado gráfico (sudoku-específico) — `sudoku/renderer.py`
 
-**Objetivo:** representar el tablero y el estado de superposición.
+**Objetivo:** visualizar el tablero y la ejecución del solver.
 
-- `board.py`: clase `Board` con:
-  - Matriz 9×9 de `Cell`, donde cada `Cell` mantiene un `set[int]` con los candidatos posibles.
-  - Una celda "colapsada" es aquella con un único candidato.
-  - Métodos: `from_string`, `to_string`, `clone`, `is_solved`, `entropy(r, c)`.
-- `parser.py`: aceptar formatos comunes:
-  - Cadena plana de 81 caracteres (`0` o `.` = vacío).
-  - Archivo de texto con 9 líneas de 9 dígitos.
-- Validación de entrada: tamaño correcto, sólo dígitos `0-9` o vacíos.
+- **Matplotlib estático primero**:
+  - `render(board, path)` — guarda PNG/SVG. Rejilla 9×9, bordes gruesos cada 3 celdas, pistas en negrita, resueltos en color distinto, candidatos en celdas no colapsadas.
+  - `render_steps(boards, path)` — genera GIF/PDF multipágina consumiendo los eventos del solver. Da la sensación de animación sin requerir GUI.
+- **Diseño preparado para interactivo**:
+  - API estable `render(board, path=None)`; un backend futuro (`renderer_interactive.py` con matplotlib animation o pygame) implementa la misma firma para ventana en vivo.
+- **WSL2 / interactivo**: cuando se aborde, configurar WSLg (Win11 nativo) o VcXsrv. Por ahora estático no requiere display.
 
-**Entregable:** se puede cargar un tablero desde string/archivo e imprimirlo en consola.
+**Codificación de colores:**
+- Pistas iniciales: negro.
+- Celdas colapsadas por el solver: azul.
+- Celdas en propagación reciente: resaltado amarillo (sólo en animación).
+- Contradicción: rojo.
 
----
-
-### Fase 2 — Restricciones y propagación
-
-**Objetivo:** implementar el motor que reduce candidatos.
-
-- `constraints.py`:
-  - `peers(r, c) -> set[(r, c)]`: devuelve las 20 celdas que comparten fila, columna o caja con `(r, c)`.
-  - `propagate(board, r, c)`: tras colapsar `(r, c)` a un valor `v`, elimina `v` del conjunto de candidatos de todos sus peers; si algún peer queda con un único candidato, propaga recursivamente (constraint propagation / AC-3 simplificado).
-  - Detección de contradicción: una celda con `candidatos = ∅` señala inconsistencia.
-- Estrategias adicionales (incrementales, opcionales por fase):
-  - **Naked singles** (incluida en la propagación básica).
-  - **Hidden singles** dentro de fila/columna/caja.
-
-**Entregable:** dado un tablero parcialmente resuelto, la propagación reduce candidatos correctamente y detecta contradicciones.
-
----
-
-### Fase 3 — Algoritmo WFC + backtracking
-
-**Objetivo:** el solver principal.
-
-- `solver.py`: función `solve(board) -> Board | None`:
-  1. Propagar restricciones iniciales sobre todas las pistas dadas.
-  2. Si el tablero está resuelto → retornar.
-  3. Si hay contradicción → retornar `None`.
-  4. Elegir la celda no colapsada de **menor entropía** (regla MRV — Minimum Remaining Values; rompe empates aleatoriamente o por orden lexicográfico).
-  5. Para cada candidato `v` de esa celda (ordenado opcionalmente por heurística LCV — Least Constraining Value):
-     - Clonar el tablero, colapsar a `v`, propagar, recursión.
-     - Si la recursión devuelve solución, propagar hacia arriba.
-  6. Si ningún candidato funciona → retornar `None` (backtrack).
-- Instrumentación: contadores de `collapses`, `propagations`, `backtracks` y tiempo total para evaluar rendimiento.
-- Modo "step" que produce un generador con cada estado intermedio (útil para visualización animada).
-
-**Entregable:** `solve()` resuelve los tableros de `examples/` y reporta métricas.
-
----
-
-### Fase 4 — Renderizado gráfico
-
-**Objetivo:** visualizar el tablero y la ejecución del algoritmo.
-
-- `renderer.py` con **dos backends** (elegir uno; matplotlib como default por simplicidad):
-  - **Estático (matplotlib):** rejilla 9×9, bordes gruesos cada 3 celdas, pistas en negrita, valores resueltos en color distinto, candidatos pequeños en celdas no colapsadas.
-  - **Animado:** consume el generador `step` del solver y produce un GIF/MP4 (o ventana interactiva) mostrando colapsos y propagaciones.
-- API:
-  - `render_board(board, path=None)` — guarda PNG o muestra ventana.
-  - `render_solution(initial, steps, path)` — anima la resolución.
-- Codificación de colores:
-  - Pistas iniciales: negro.
-  - Celdas colapsadas por el solver: azul.
-  - Celdas en propagación reciente: resaltado amarillo (sólo en animación).
-  - Contradicción: rojo.
-
-**Entregable:** comando `python -m wfc solve examples/medium.txt --render out.png` genera la imagen del tablero resuelto.
+**Entregable:** `wfc solve examples/medium.txt --render out.png` genera la imagen.
 
 ---
 
 ### Fase 5 — CLI y empaquetado
 
-**Objetivo:** que sea ejecutable cómodamente.
+**Estado actual:** parcial.
 
-- `cli.py` con `argparse`:
-  - `wfc show <input>` — carga y pinta el tablero (acepta archivo, string de 81 chars o `-` para stdin). *(adelantado tras fase 1.)*
-  - `wfc validate <input>` — reporta givens y estado de resolución; en su forma completa chequea unicidad de solución. *(parcial; unicidad requiere solver de fase 3.)*
-  - `wfc generate [--givens N] [--seed N] [--raw] [--save [PATH]]` — genera un tablero válido aleatorio (solución completa por defecto, o puzzle con N pistas). Con `--save` guarda en archivo (con `PATH` explícito o auto-nombrado en `examples/generated/`). *(adelantado; unicidad de solución se verifica en fase 3.)*
-  - `wfc solve <input> [--render <path>] [--animate <path>] [--seed N] [--verbose]`
-  - `wfc bench <dir>` (corre todos los ejemplos y reporta tiempos).
-- Entry point en `pyproject.toml` (`[project.scripts] wfc = "wfc.cli:main"`).
-
-**Entregable:** `pip install -e .` y luego `wfc solve …` funciona.
+- ✅ `wfc show <input>`
+- ✅ `wfc validate <input>`
+- ✅ `wfc generate [--givens N] [--seed N] [--raw] [--save [PATH]]`
+- ⏳ `wfc solve <input> [--render <path>] [--animate <path>] [--seed N] [--policy backtrack|restart] [--verbose]` (fase 3b/3c/4)
+- ⏳ `wfc bench <dir>` (fase 3c)
+- ✅ Logging global `-v` / `-vv`
+- ✅ Entry point `wfc` en `pyproject.toml`.
 
 ---
 
 ## 4. Plan de pruebas
 
-Cada fase incluye sus tests; el conjunto crece de forma acumulativa.
+### Tests existentes (75 verdes)
 
-### 4.1 Tests unitarios — `test_board.py`
+Cubren fases 0/1/2 + CLI parcial. Se reorganizan en `tests/sudoku/`.
 
-- Carga desde string de 81 caracteres con `0` y con `.`.
-- Rechazo de inputs inválidos (longitud, caracteres).
-- Round-trip `from_string` → `to_string`.
-- `is_solved` falso en tableros con vacíos, verdadero en uno completamente correcto.
-- `clone` produce copia independiente (mutar uno no afecta al otro).
+### Tests del engine (fase 3b) — `tests/core/`
 
-### 4.2 Tests unitarios — `test_constraints.py`
+- `test_wave.py`: una implementación mock mínima (e.g. variables en lista, dominios `set[int]`) satisface el protocol. Operaciones básicas (clone, entropy, is_fully_collapsed).
+- `test_engine.py`: con un constraint trivial y un wave de 3-4 variables, el engine resuelve, detecta contradicción, hace backtracking.
+- `test_selector.py`: `LowestEntropySelector` elige correctamente; rompe empates de forma determinista con seed.
+- `test_sampler.py`: `UniformSampler` recorre el dominio; con seed es determinista.
+- `test_policy.py`: `BacktrackPolicy` reintenta con otro valor; falla cuando el dominio se agota.
 
-- `peers(0,0)` devuelve exactamente 20 celdas conocidas.
-- Propagar un colapso elimina el valor de todos los peers.
-- Propagar genera cadenas de naked singles correctas.
-- Tablero con contradicción explícita es detectado.
-- Hidden singles: dado un escenario donde sólo una celda de un bloque puede contener `7`, esa celda se colapsa.
+### Tests del adapter sudoku (fase 3b en adelante) — `tests/sudoku/`
 
-### 4.3 Tests del solver — `test_solver.py`
+- `test_solver.py` (fase 3b):
 
-Casos por dificultad (en `tests/fixtures/`):
+  | Caso | Tipo | Qué prueba |
+  | --- | --- | --- |
+  | `easy_1` | ≥45 pistas | Resuelto sin backtracking. |
+  | `medium_1` | medio | Pocas decisiones. |
+  | `hard_1` | difícil | Backtracking moderado. |
+  | `expert_1` | AI Escargot | Stress test. |
+  | `minimal_17` | 17 pistas | Solución única encontrada. |
+  | `multiple_solutions` | <17 pistas | Devuelve alguna válida; `validate` reporta no-único. |
+  | `unsolvable` | Contradicción inicial | Devuelve `None`. |
+  | `already_solved` | Completo correcto | Sin cambios. |
+  | `invalid_complete` | Completo con duplicado | Devuelve `None`. |
 
-| Caso | Tipo | Qué prueba |
-| --- | --- | --- |
-| `easy_1` | Sudoku fácil (≥45 pistas) | Se resuelve sin backtracking. |
-| `medium_1` | Sudoku medio | Se resuelve con propagación + pocas decisiones. |
-| `hard_1` | Sudoku difícil | Requiere backtracking moderado. |
-| `expert_1` | "AI Escargot" (uno de los más difíciles conocidos) | Stress test de backtracking. |
-| `minimal_17` | Sudoku con 17 pistas (mínimo conocido) | El solver llega a una única solución. |
-| `multiple_solutions` | Tablero con <17 pistas y múltiples soluciones | `solve` retorna alguna válida; `validate` reporta no-único. |
-| `unsolvable` | Tablero con contradicción inicial | `solve` retorna `None`. |
-| `already_solved` | Tablero completo y correcto | Devuelto sin cambios. |
-| `invalid_complete` | Tablero completo pero con un duplicado | `solve` retorna `None`. |
+  Aserciones: solución válida (filas/cols/cajas = `{1..9}`); pistas preservadas; determinismo bajo `--seed`.
 
-Aserciones en cada caso:
-- Solución válida: cada fila, columna y caja contiene `{1..9}` exactamente.
-- Las pistas iniciales se preservan.
-- Determinismo bajo `--seed` fijo.
+- `test_renderer.py` (fase 4): PNG no vacío, dimensiones esperadas, N frames en `render_steps`.
 
-### 4.4 Tests de rendimiento (smoke) — `test_solver.py`
+### Integración end-to-end
 
-- Cada caso resuelto en menos de un umbral razonable (`easy` < 50 ms, `expert` < 5 s en CI). Marcar como `pytest.mark.slow` los que excedan.
-
-### 4.5 Tests de renderizado — `test_renderer.py`
-
-- `render_board` produce un archivo PNG no vacío y con dimensiones esperadas.
-- No se hace comparación pixel-perfect; se valida que el archivo se crea y que `render_solution` produce N frames esperados.
-
-### 4.6 Integración
-
-- Test end-to-end vía CLI con `subprocess`: `wfc solve examples/easy.txt` retorna código 0 y stdout con tablero resuelto.
+`subprocess` invocando la CLI con tableros de `examples/`.
 
 ---
 
-## 5. Hitos y orden de ejecución
+## 5. Hitos
 
-1. **Hito 1 — Datos:** Fases 0–1 cerradas + tests de board pasando.
-2. **Hito 2 — Lógica:** Fase 2 + tests de constraints.
-3. **Hito 3 — Solver funcional:** Fase 3 resolviendo `easy/medium/hard`.
-4. **Hito 4 — Stress:** Solver pasa `expert` y `minimal_17`.
-5. **Hito 5 — Visualización:** Fase 4 con renderizado estático.
-6. **Hito 6 — UX:** Fase 5 (CLI) + animación + benchmarks.
+1. **Hito 1 — Datos:** fases 0–1. ✅
+2. **Hito 2 — Lógica básica:** fase 2. ✅
+3. **Hito 3a — Refactor:** estructura core/adapter, 75 tests verdes. ⏳ (en curso)
+4. **Hito 3b — Solver:** engine genérico + sudoku resuelve easy/medium/hard.
+5. **Hito 3c — Policies:** backtrack + restart + benchmark.
+6. **Hito 4 — Visualización:** matplotlib estático + GIF.
+7. **Hito 5 — UX:** CLI completa, animación, segunda aplicación (tiles) como prueba de reutilización.
 
 ---
 
-## 6. Decisiones técnicas a confirmar
+## 6. Decisiones técnicas (consolidadas)
 
-- **Backend gráfico:** `matplotlib` (estático y GIF vía `FuncAnimation`) vs. `pygame` (interactivo). Default propuesto: matplotlib.
-- **Estructura de candidatos:** `set[int]` (claridad) vs. bitmask `int` de 9 bits (rendimiento). Default propuesto: `set` en primera iteración, optimizar si el benchmark lo exige.
-- **Estrategia de búsqueda:** sólo MRV vs. MRV + LCV. Default: MRV; añadir LCV si los tiempos del caso `expert` lo justifican.
-- **Aleatoriedad:** semilla fija por defecto para tests deterministas; flag `--seed` en CLI.
+- **Variante WFC:** `ResolutionPolicy` pluggable. Default sudoku: backtracking. Restart se agrega en 3c para validar la reutilización.
+- **Heurística de selección:** entropía mínima en el core (universal a WFC). LCV no se implementa por defecto; queda como hook opcional en el sampler si benchmarks lo justifican.
+- **Muestreo de valores:** uniforme por defecto. `WeightedSampler` para aplicaciones futuras con pesos por estado (tiles).
+- **Backend gráfico (sudoku):** matplotlib estático + GIF. Interactivo (matplotlib animation o pygame) se agrega con backend separado.
+- **Estructura de candidatos:** `set[int]` por claridad; bitmask si benchmarks lo exigen.
+- **Aleatoriedad:** seed fija en tests; `--seed` en CLI.
+- **Eventos del engine:** generator de eventos tipados — permite instrumentación, logs y animación desacopladas del loop.
 
 ---
 
 ## 7. Riesgos y mitigaciones
 
-- **Backtracking explosivo en casos extremos:** mitigar con propagación más fuerte (hidden singles, naked pairs) antes de añadir más profundidad de búsqueda.
-- **Tests lentos en CI:** marcar casos pesados como `slow` y excluirlos del run por defecto.
-- **Acoplamiento renderer ↔ solver:** mantener el solver agnóstico (emite estados via generator); el renderer los consume.
+- **Sobreingeniería del engine genérico:** mitigar con regla "primero hacerlo funcionar para sudoku, abstraer sólo lo que la segunda aplicación necesite". No inventar Protocols sin un segundo cliente real en mente.
+- **Backtracking explosivo en casos extremos:** propagación más fuerte (naked pairs, X-wing) antes que más profundidad.
+- **Tests lentos en CI:** marcar pesados como `slow`, excluir del run por defecto.
+- **Acoplamiento renderer ↔ solver:** el engine emite eventos; el renderer los consume. Cero acoplamiento directo.

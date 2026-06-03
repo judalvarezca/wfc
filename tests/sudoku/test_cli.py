@@ -143,8 +143,8 @@ def test_generate_save_file_is_9_lines(tmp_path):
 
 
 def test_generate_saved_file_roundtrips(tmp_path):
-    from wfc.generator import generate_puzzle
-    from wfc.parser import from_file
+    from wfc.sudoku.generator import generate_puzzle
+    from wfc.sudoku.parser import from_file
 
     out = tmp_path / "p.txt"
     main(["generate", "--seed", "42", "--givens", "30", "--save", str(out)])

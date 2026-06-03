@@ -1,7 +1,7 @@
 import pytest
 
-from wfc.board import Board
-from wfc.constraints import ContradictionError, is_consistent, peers, propagate
+from wfc.sudoku.board import Board
+from wfc.sudoku.constraints import ContradictionError, is_consistent, peers, propagate
 
 EASY = (
     "530070000"

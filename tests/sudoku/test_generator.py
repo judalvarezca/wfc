@@ -1,6 +1,6 @@
 import pytest
 
-from wfc.generator import generate_puzzle, generate_solved
+from wfc.sudoku.generator import generate_puzzle, generate_solved
 
 
 def test_generated_solved_is_valid():

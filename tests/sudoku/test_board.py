@@ -1,7 +1,7 @@
 import pytest
 
-from wfc.board import ALL_VALUES, Board, Cell
-from wfc.parser import from_file
+from wfc.sudoku.board import ALL_VALUES, Board, Cell
+from wfc.sudoku.parser import from_file
 
 EASY = (
     "530070000"

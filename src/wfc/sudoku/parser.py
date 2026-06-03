@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wfc.board import Board
+from wfc.sudoku.board import Board
 
 
 def from_file(path: str | Path) -> Board:
