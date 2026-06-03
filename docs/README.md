@@ -154,24 +154,30 @@ Componentes del **adapter sudoku**:
 
 ---
 
-### Fase 4 — Renderizado gráfico (sudoku-específico) — `sudoku/renderer.py`
+### Fase 4 — Visualización interactiva (web)
 
-**Objetivo:** visualizar el tablero y la ejecución del solver.
+**Decisión:** la visualización es una **app web** (FastAPI + HTML/JS vanilla), no matplotlib. Razones: no requiere display server (funciona en WSL2 sin configuración), interactiva por naturaleza, expone todas las funcionalidades de la CLI en el navegador, y desacopla velocidad de cómputo de velocidad de animación. matplotlib queda como opción futura para export estático (PNG/GIF) si se necesita.
 
-- **Matplotlib estático primero**:
-  - `render(board, path)` — guarda PNG/SVG. Rejilla 9×9, bordes gruesos cada 3 celdas, pistas en negrita, resueltos en color distinto, candidatos en celdas no colapsadas.
-  - `render_steps(boards, path)` — genera GIF/PDF multipágina consumiendo los eventos del solver. Da la sensación de animación sin requerir GUI.
-- **Diseño preparado para interactivo**:
-  - API estable `render(board, path=None)`; un backend futuro (`renderer_interactive.py` con matplotlib animation o pygame) implementa la misma firma para ventana en vivo.
-- **WSL2 / interactivo**: cuando se aborde, configurar WSLg (Win11 nativo) o VcXsrv. Por ahora estático no requiere display.
+#### Fase 4a — Instrumentación del engine con event stream ✅ CERRADA
 
-**Codificación de colores:**
-- Pistas iniciales: negro.
-- Celdas colapsadas por el solver: azul.
-- Celdas en propagación reciente: resaltado amarillo (sólo en animación).
-- Contradicción: rojo.
+- `core/events.py`: `Observed`, `Collapsed`, `Backtracked` (con `undid_vars`), `Solved`, `Contradiction`.
+- `Constraint.propagate(on_event)` emite `Collapsed` durante naked/hidden singles.
+- `BacktrackPolicy.solve(on_event)` emite `Observed`, `Collapsed` directo, `Backtracked`, `Solved`, `Contradiction`.
+- `sudoku.solver.solve_with_events(board, seed) -> (Board | None, list[Event])` captura todo.
 
-**Entregable:** `wfc solve examples/medium.txt --render out.png` genera la imagen.
+#### Fase 4b — Web app ✅ CERRADA
+
+- `wfc.web/`: FastAPI app con endpoints `/api/health`, `/api/generate`, `/api/validate`, `/api/solve`. Modelos Pydantic con discriminador `type` en los eventos.
+- Frontend: HTML + CSS + JS vanilla (sin build pipeline) en `wfc/web/static/`. Grilla 9×9 CSS, slider de delay, botones Generate/Solve/Stop/Reset/Validate, textarea para pegar/editar tableros.
+- Animación: el cliente recibe la lista completa de eventos en `POST /api/solve` y los reproduce con `setInterval(delay)`. Cada Collapsed pinta celda con flash; Observed pone outline amarillo; Backtracked hace flash rojo y limpia `undid_vars`; Solved tinta verde el tablero completo.
+- CLI: `wfc serve [--host H] [--port P] [--reload]` lanza uvicorn.
+
+**Entregable:** `wfc serve` abre el visualizador en `http://localhost:8000`.
+
+#### Fase 4c (futuro, opcional) — Export estático con matplotlib
+
+- `sudoku/renderer.py`: `render(board, path)` produce PNG/SVG; `render_steps(events, path)` genera GIF/MP4 desde el event stream.
+- Útil para incluir en docs o compartir resoluciones sin el server.
 
 ---
 

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WFC Sudoku</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Wave Function Collapse — Sudoku</h1>
+      <p class="subtitle">Watch the solver fill the grid step by step.</p>
+    </header>
+
+    <section class="board-wrap">
+      <div id="board" class="board" aria-label="Sudoku board"></div>
+    </section>
+
+    <section class="controls">
+      <div class="row">
+        <label>Givens
+          <input id="givens" type="number" min="0" max="81" value="30">
+        </label>
+        <label>Seed
+          <input id="seed" type="number" placeholder="(random)">
+        </label>
+        <button id="btn-generate" type="button">Generate</button>
+      </div>
+
+      <div class="row">
+        <label class="grow">Delay per step: <span id="delay-label">200</span> ms
+          <input id="delay" type="range" min="20" max="2000" step="20" value="200">
+        </label>
+      </div>
+
+      <div class="row">
+        <button id="btn-solve" type="button">Solve</button>
+        <button id="btn-stop" type="button" disabled>Stop</button>
+        <button id="btn-reset" type="button">Reset</button>
+        <button id="btn-validate" type="button">Validate</button>
+      </div>
+
+      <div class="row">
+        <label class="grow">Paste/edit board (81 chars, 0 = empty):
+          <textarea id="board-input" rows="3"></textarea>
+        </label>
+      </div>
+
+      <div id="status" class="status" role="status">Ready.</div>
+      <div id="validate-out" class="validate-out"></div>
+    </section>
+
+    <footer>
+      <a href="https://github.com" tabindex="-1" aria-hidden="true" style="visibility:hidden">_</a>
+      <span class="hint">Tip: Generate → Solve. Adjust delay to taste.</span>
+    </footer>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

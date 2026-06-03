@@ -131,6 +131,13 @@ def cmd_solve(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    from wfc.web.server import run
+
+    run(host=args.host, port=args.port, reload=args.reload)
+    return 0
+
+
 def cmd_not_implemented(args: argparse.Namespace) -> int:
     print(f"[wfc] command '{args.command}' is not implemented yet.", file=sys.stderr)
     return 1
@@ -201,6 +208,14 @@ def build_parser() -> argparse.ArgumentParser:
     bench = sub.add_parser("bench", help="Benchmark the solver (not implemented yet).")
     bench.add_argument("dir", help="Directory containing puzzle files.")
     bench.set_defaults(func=cmd_not_implemented)
+
+    serve = sub.add_parser("serve", help="Run the web UI (FastAPI + browser).")
+    serve.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1).")
+    serve.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000).")
+    serve.add_argument(
+        "--reload", action="store_true", help="Auto-reload on code changes (dev)."
+    )
+    serve.set_defaults(func=cmd_serve)
 
     return parser
 
