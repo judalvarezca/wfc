@@ -146,6 +146,14 @@ footer {
 
 .row label.grow { flex: 1 1 100%; }
 
+.btn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-stack button { width: 100%; }
+
 .row input[type="number"] {
   width: 90px;
 }
