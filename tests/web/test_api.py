@@ -46,6 +46,25 @@ def test_generate_returns_81_char_board():
     assert givens == 30
 
 
+def test_generate_omitted_givens_returns_full_solved_board():
+    """No givens field → 81 (full solved). Matches CLI default."""
+    r = client.post("/api/generate", json={"seed": 7})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["givens"] == 81
+    assert all(c in "123456789" for c in body["board"])
+
+
+def test_generate_null_givens_returns_full_solved_board():
+    """Explicit null is treated the same as omitted (the frontend sends this
+    when the Givens input is empty)."""
+    r = client.post("/api/generate", json={"givens": None, "seed": 7})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["givens"] == 81
+    assert all(c in "123456789" for c in body["board"])
+
+
 def test_generate_invalid_givens_rejected():
     r = client.post("/api/generate", json={"givens": 100})
     assert r.status_code == 422  # Pydantic validation

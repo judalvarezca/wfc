@@ -57,8 +57,9 @@ def health() -> dict[str, str]:
 
 @app.post("/api/generate", response_model=GenerateResponse)
 def api_generate(req: GenerateRequest) -> GenerateResponse:
-    board = generate_puzzle(givens=req.givens, seed=req.seed)
-    return GenerateResponse(board=board.to_string(), givens=req.givens, seed=req.seed)
+    givens = req.givens if req.givens is not None else 81
+    board = generate_puzzle(givens=givens, seed=req.seed)
+    return GenerateResponse(board=board.to_string(), givens=givens, seed=req.seed)
 
 
 @app.post("/api/validate", response_model=ValidateResponse)

@@ -15,7 +15,9 @@ class BoardInput(BaseModel):
 
 
 class GenerateRequest(BaseModel):
-    givens: int = Field(default=30, ge=0, le=81)
+    # Default 81 (full solved board) matches the CLI's `wfc generate` default
+    # and means "omit givens to get a complete puzzle".
+    givens: int | None = Field(default=None, ge=0, le=81)
     seed: int | None = None
 
 

@@ -334,7 +334,7 @@ async function doGenerate() {
   setControlsBusy(true);
   setStatus("Generating…");
   try {
-    const givens = parseInt(givensEl.value, 10);
+    const givens = givensEl.value === "" ? null : parseInt(givensEl.value, 10);
     const seed = seedEl.value === "" ? null : parseInt(seedEl.value, 10);
     const data = await api("/api/generate", { givens, seed });
     renderFreshPuzzle(data.board);
