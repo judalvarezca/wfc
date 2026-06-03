@@ -13,6 +13,7 @@ const validateOut = document.getElementById("validate-out");
 const boardInput = document.getElementById("board-input");
 
 const btnGenerate = document.getElementById("btn-generate");
+const btnClear = document.getElementById("btn-clear");
 const btnSolve = document.getElementById("btn-solve");
 const btnStop = document.getElementById("btn-stop");
 const btnReset = document.getElementById("btn-reset");
@@ -62,6 +63,7 @@ function setStatus(text) {
 
 function setControlsBusy(busy) {
   btnGenerate.disabled = busy;
+  btnClear.disabled = busy;
   btnSolve.disabled = busy;
   btnReset.disabled = busy;
   btnValidate.disabled = busy;
@@ -424,11 +426,19 @@ function doReset() {
   validateOut.textContent = "";
 }
 
+function doClear() {
+  if (isPlaying) doStop();
+  renderFreshPuzzle("0".repeat(81));
+  setStatus("Board cleared.");
+  validateOut.textContent = "";
+}
+
 delayEl.addEventListener("input", () => {
   delayLabel.textContent = delayEl.value;
 });
 
 btnGenerate.addEventListener("click", doGenerate);
+btnClear.addEventListener("click", doClear);
 btnSolve.addEventListener("click", doSolve);
 btnStop.addEventListener("click", doStop);
 btnReset.addEventListener("click", doReset);
