@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Protocol, runtime_checkable
 
+from wfc.core.events import EventSink
 from wfc.core.wave import VarId, Wave
 
 
@@ -17,10 +18,18 @@ class Constraint(Protocol):
     Constraints should propagate to fixed point internally if their rules
     interact (e.g. naked + hidden singles). The engine handles inter-constraint
     fixed point by looping over all constraints until none report changes.
+
+    When `on_event` is provided, the constraint must emit a `Collapsed` event
+    for every variable it collapses during propagation — this lets a UI
+    visualize the chain reaction of naked/hidden singles rather than seeing
+    every cell appear at once.
     """
 
     def propagate(
-        self, wave: Wave, seed: Iterable[VarId] | None = None
+        self,
+        wave: Wave,
+        seed: Iterable[VarId] | None = None,
+        on_event: EventSink | None = None,
     ) -> set[VarId]:
         """Apply this constraint to `wave`.
 

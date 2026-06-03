@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from wfc.core.engine import solve as engine_solve
+from wfc.core.events import Event
 from wfc.sudoku.adapter import BoardWave, SudokuConstraint
 from wfc.sudoku.board import Board
 
@@ -28,3 +29,24 @@ def solve(board: Board, seed: int | None = None) -> Board | None:
     if not isinstance(result, BoardWave):
         raise TypeError(f"engine returned unexpected wave type {type(result).__name__}")
     return result.board
+
+
+def solve_with_events(
+    board: Board, seed: int | None = None
+) -> tuple[Board | None, list[Event]]:
+    """Solve a sudoku board and return the full event stream.
+
+    Same semantics as `solve`, but additionally captures every Observed,
+    Collapsed, Backtracked, Solved and Contradiction event the engine emits.
+    The event list lets UIs replay the solving process at an arbitrary pace.
+    """
+    events: list[Event] = []
+    wave = BoardWave(board.clone())
+    result = engine_solve(
+        wave, [SudokuConstraint()], seed=seed, on_event=events.append
+    )
+    if result is None:
+        return None, events
+    if not isinstance(result, BoardWave):
+        raise TypeError(f"engine returned unexpected wave type {type(result).__name__}")
+    return result.board, events

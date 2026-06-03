@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 
+from wfc.core.events import Collapsed, EventSink
 from wfc.core.exceptions import ContradictionError
 from wfc.core.wave import Wave
 
@@ -67,7 +68,10 @@ class AllDifferentConstraint:
     """Every variable in the wave must take a distinct value."""
 
     def propagate(
-        self, wave: Wave, seed: Iterable[int] | None = None
+        self,
+        wave: Wave,
+        seed: Iterable[int] | None = None,
+        on_event: EventSink | None = None,
     ) -> set[int]:
         before = {v for v in wave.variables() if wave.is_collapsed(v)}
         changed = True
@@ -80,7 +84,14 @@ class AllDifferentConstraint:
                 for other in wave.variables():
                     if other == var:
                         continue
+                    was_collapsed = wave.is_collapsed(other)
                     if wave.eliminate(other, value):
                         changed = True
+                        if (
+                            not was_collapsed
+                            and wave.is_collapsed(other)
+                            and on_event is not None
+                        ):
+                            on_event(Collapsed(other, wave.value(other)))
         after = {v for v in wave.variables() if wave.is_collapsed(v)}
         return after - before

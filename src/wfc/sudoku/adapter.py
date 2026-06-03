@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 
+from wfc.core.events import EventSink
 from wfc.core.exceptions import ContradictionError
 from wfc.core.wave import VarId, Wave
 from wfc.sudoku.board import SIZE, Board
@@ -92,7 +93,10 @@ class SudokuConstraint:
     """
 
     def propagate(
-        self, wave: Wave, seed: Iterable[VarId] | None = None
+        self,
+        wave: Wave,
+        seed: Iterable[VarId] | None = None,
+        on_event: EventSink | None = None,
     ) -> set[SudokuVar]:
         if not isinstance(wave, BoardWave):
             raise TypeError(
@@ -100,7 +104,7 @@ class SudokuConstraint:
             )
         board = wave.board
         before = _collapsed_set(board)
-        sudoku_propagate(board, seed=None)
+        sudoku_propagate(board, seed=None, on_event=on_event)
         after = _collapsed_set(board)
         return after - before
 

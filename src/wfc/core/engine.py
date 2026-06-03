@@ -5,6 +5,7 @@ import random
 from collections.abc import Iterable
 
 from wfc.core.constraint import Constraint
+from wfc.core.events import EventSink
 from wfc.core.policy import BacktrackPolicy, ResolutionPolicy
 from wfc.core.sampler import UniformSampler, ValueSampler
 from wfc.core.selector import CellSelector, LowestEntropySelector
@@ -20,6 +21,7 @@ def solve(
     sampler: ValueSampler | None = None,
     policy: ResolutionPolicy | None = None,
     seed: int | None = None,
+    on_event: EventSink | None = None,
 ) -> Wave | None:
     """Solve a wave under a set of constraints.
 
@@ -29,6 +31,10 @@ def solve(
     Defaults: lowest-entropy selector, uniform sampler (seeded by `seed` for
     reproducibility), backtracking policy. Override any component to plug a
     different strategy.
+
+    `on_event` is forwarded to the policy and constraints; pass a callable to
+    receive the engine's event stream (Observed/Collapsed/Backtracked/Solved/
+    Contradiction). Useful for UI visualization and debugging.
     """
     rng = random.Random(seed) if seed is not None else None
     selector = selector or LowestEntropySelector(rng=rng)
@@ -41,4 +47,4 @@ def solve(
         type(policy).__name__,
         seed,
     )
-    return policy.solve(wave, constraints, selector, sampler)
+    return policy.solve(wave, constraints, selector, sampler, on_event=on_event)

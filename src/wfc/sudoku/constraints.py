@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from functools import cache
 
+from wfc.core.events import Collapsed, EventSink
 from wfc.core.exceptions import ContradictionError
 from wfc.sudoku.board import BOX, SIZE, Board
 
@@ -59,7 +60,9 @@ def is_consistent(board: Board) -> bool:
     return True
 
 
-def _apply_hidden_singles(board: Board) -> list[tuple[int, int]]:
+def _apply_hidden_singles(
+    board: Board, on_event: EventSink | None = None
+) -> list[tuple[int, int]]:
     new_collapses: list[tuple[int, int]] = []
     for unit in UNITS:
         for v in range(1, SIZE + 1):
@@ -71,17 +74,27 @@ def _apply_hidden_singles(board: Board) -> list[tuple[int, int]]:
                 if not board.cells[r][c].collapsed:
                     board.cells[r][c].candidates = {v}
                     logger.debug("hidden single: (%d,%d) = %d", r, c, v)
+                    if on_event is not None:
+                        on_event(Collapsed((r, c), v))
                     new_collapses.append((r, c))
     return new_collapses
 
 
-def propagate(board: Board, seed: tuple[int, int] | None = None) -> None:
+def propagate(
+    board: Board,
+    seed: tuple[int, int] | None = None,
+    on_event: EventSink | None = None,
+) -> None:
     """Apply naked + hidden single rules to fixed point. Mutates board.
 
     With `seed=(r, c)`, treats that as the only newly collapsed cell (incremental).
     Without `seed`, propagates from every currently-collapsed cell (full sweep).
     Raises Contradiction if any cell ends up with zero candidates or if some value
     has no place in a unit.
+
+    When `on_event` is provided, emits a `Collapsed` event for each cell that
+    becomes collapsed during propagation. Useful for UI visualization of the
+    naked/hidden single chain reaction.
     """
     if seed is not None:
         queue: list[tuple[int, int]] = [seed]
@@ -94,7 +107,7 @@ def propagate(board: Board, seed: tuple[int, int] | None = None) -> None:
         ]
 
     initial = sum(1 for cell in board.iter_cells() if cell.collapsed)
-    logger.info("propagate: starting with %d collapsed cells", initial)
+    logger.debug("propagate: starting with %d collapsed cells", initial)
 
     iteration = 0
     eliminations_total = 0
@@ -121,12 +134,13 @@ def propagate(board: Board, seed: tuple[int, int] | None = None) -> None:
                         raise ContradictionError(f"cell ({pr},{pc}) has no candidates left")
                     if peer.collapsed:
                         iter_naked += 1
-                        logger.debug(
-                            "naked single: (%d,%d) = %d", pr, pc, next(iter(peer.candidates))
-                        )
+                        peer_value = next(iter(peer.candidates))
+                        logger.debug("naked single: (%d,%d) = %d", pr, pc, peer_value)
+                        if on_event is not None:
+                            on_event(Collapsed((pr, pc), peer_value))
                         queue.append((pr, pc))
 
-        new_collapses = _apply_hidden_singles(board)
+        new_collapses = _apply_hidden_singles(board, on_event=on_event)
         eliminations_total += iter_eliminations
         naked_total += iter_naked
         hidden_total += len(new_collapses)
@@ -139,7 +153,7 @@ def propagate(board: Board, seed: tuple[int, int] | None = None) -> None:
         )
         if not new_collapses:
             final = sum(1 for cell in board.iter_cells() if cell.collapsed)
-            logger.info(
+            logger.debug(
                 "propagate: done in %d iterations — %d eliminations, "
                 "%d naked + %d hidden collapses → %d/81 cells",
                 iteration,
